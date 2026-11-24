@@ -257,7 +257,4 @@ Konfigurasi ini ditujukan untuk demonstrasi lokal, bukan server publik:
 - Jangan mengekspos Node-RED, broker, atau API ke internet tanpa menambahkan
   autentikasi, enkripsi, pembatasan akses, dan pengelolaan rahasia yang layak.
 
-## Lisensi
 
-Belum ada file lisensi pada proyek ini. Tambahkan file `LICENSE` dan pilih
-lisensi yang sesuai sebelum mengizinkan penggunaan ulang oleh publik.
