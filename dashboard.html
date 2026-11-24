@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IoT Dashboard - Monitoring Sensor</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+    background: linear-gradient(135deg,#667eea,#764ba2);
+    min-height: 100vh;
+    padding: 20px;
+    color: #333;
+}
+
+.container {
+    max-width: 1100px;
+    margin: auto;
+}
+
+h1 {
+    color: white;
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+h2 {
+    font-size: 18px;
+    margin-bottom: 18px;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(200px,1fr));
+    gap: 18px;
+    margin-bottom: 25px;
+}
+
+.card, .panel {
+    background: white;
+    border-radius: 15px;
+    padding: 22px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.15);
+}
+
+.card {
+    text-align: center;
+}
+
+.label {
+    color: #888;
+    font-size: 13px;
+    text-transform: uppercase;
+}
+
+.value {
+    font-size: 38px;
+    font-weight: bold;
+    color: #667eea;
+    margin: 12px 0;
+}
+
+.unit {
+    color: #999;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.online {
+    background: #d4edda;
+    color: #155724;
+}
+
+.offline {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.normal {
+    background: #d4edda;
+    color: #155724;
+}
+
+.warning {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.panel {
+    margin-bottom: 22px;
+}
+
+.threshold-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(200px,1fr));
+    gap: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+.btn {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    margin-top: 15px;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-on {
+    background: #28a745;
+    color: white;
+}
+
+.btn-off {
+    background: #dc3545;
+    color: white;
+}
+
+.btn:hover {
+    opacity: .85;
+}
+
+.threshold-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 18px;
+}
+
+.threshold-box {
+    flex: 1;
+    min-width: 180px;
+    padding: 15px;
+    border-radius: 10px;
+    background: #f5f5f5;
+}
+
+.threshold-box p {
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #777;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+    font-size: 14px;
+}
+
+th {
+    background: #f5f6fa;
+    color: #666;
+}
+
+#log {
+    background: #1e1e1e;
+    color: #0f0;
+    padding: 15px;
+    border-radius: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+#log .error {
+    color: #ff6666;
+}
+
+#log .info {
+    color: #66aaff;
+}
+
+#log .success {
+    color: #00ff88;
+}
+
+#log .warning-log {
+    color: #ffcc33;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+@media(max-width:600px) {
+    body {
+        padding: 10px;
+    }
+
+    h1 {
+        font-size: 21px;
+    }
+
+    .panel {
+        padding: 15px;
+        overflow-x: auto;
+    }
+
+    .btn {
+        width: 100%;
+    }
+
+    table {
+        min-width: 450px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>IoT Dashboard Monitoring Sensor</h1>
+
+<!-- MONITORING SENSOR -->
+
+<div class="cards">
+
+    <div class="card">
+        <div class="label">Suhu</div>
+        <div class="value" id="suhu">--</div>
+        <div class="unit">°C</div>
+    </div>
+
+    <div class="card">
+        <div class="label">Kelembaban</div>
+        <div class="value" id="kelembaban">--</div>
+        <div class="unit">%</div>
+    </div>
+
+    <div class="card">
+        <div class="label">Status Sensor</div>
+        <div class="value">
+            <span class="status-badge offline"
+                  id="status-badge">
+                OFFLINE
+            </span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="label">Status Threshold</div>
+        <div class="value">
+            <span class="status-badge normal"
+                  id="threshold-badge">
+                NORMAL
+            </span>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- PENGATURAN THRESHOLD -->
+
+<div class="panel">
+
+    <h2>Pengaturan Threshold Sensor</h2>
+
+    <div class="threshold-grid">
+
+        <div class="form-group">
+            <label>Threshold Suhu Maksimum (°C)</label>
+            <input type="number"
+                   id="thresholdSuhu"
+                   value="30"
+                   min="-50"
+                   max="100"
+                   step="0.1">
+        </div>
+
+        <div class="form-group">
+            <label>Threshold Kelembaban Maksimum (%)</label>
+            <input type="number"
+                   id="thresholdKelembaban"
+                   value="80"
+                   min="0"
+                   max="100"
+                   step="0.1">
+        </div>
+
+    </div>
+
+    <button class="btn btn-primary"
+            onclick="simpanThreshold()">
+        Simpan Threshold
+    </button>
+
+    <div class="threshold-status">
+
+        <div class="threshold-box">
+            <p>STATUS SUHU</p>
+            <span class="status-badge normal"
+                  id="statusSuhu">
+                NORMAL
+            </span>
+        </div>
+
+        <div class="threshold-box">
+            <p>STATUS KELEMBABAN</p>
+            <span class="status-badge normal"
+                  id="statusKelembaban">
+                NORMAL
+            </span>
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- PERINGATAN SENSOR -->
+
+<div class="panel">
+
+    <h2>Peringatan Sensor</h2>
+
+    <div id="peringatan"
+         style="padding:15px;
+                background:#d4edda;
+                color:#155724;
+                border-radius:10px;">
+        Sensor dalam kondisi NORMAL
+    </div>
+
+    <button class="btn btn-primary" type="button" onclick="aktifkanNotifikasi()">Aktifkan Notifikasi Browser</button>
+
+</div>
+
+
+<!-- GRAFIK SENSOR -->
+
+<div class="panel">
+
+    <h2>Grafik Monitoring Sensor</h2>
+
+    <div class="chart-container">
+        <canvas id="sensorChart"></canvas>
+    </div>
+
+</div>
+
+
+<!-- KONTROL LAMPU -->
+
+<div class="panel">
+
+    <h2>Kontrol Perangkat</h2>
+
+    <div class="controls">
+
+        <button class="btn btn-on"
+                onclick="kontrol('lamp','on')">
+            Nyalakan Lampu
+        </button>
+
+        <button class="btn btn-off"
+                onclick="kontrol('lamp','off')">
+            Matikan Lampu
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- HISTORY -->
+
+<div class="panel">
+
+    <h2>10 Data Sensor Terakhir</h2>
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>Waktu</th>
+                <th>Suhu (°C)</th>
+                <th>Kelembaban (%)</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody id="history-body">
+
+            <tr>
+                <td colspan="4"
+                    style="text-align:center">
+                    Loading...
+                </td>
+            </tr>
+
+        </tbody>
+
+    </table>
+
+</div>
+
+
+<!-- LOG -->
+
+<div class="panel">
+
+    <h2>Log Aktivitas</h2>
+
+    <div id="log"></div>
+
+</div>
+
+</div>
+
+
+<script>
+
+// =====================================
+// KONFIGURASI API
+// =====================================
+
+const API_BASE = 'http://127.0.0.1:1880/api';
+
+const API_KEY = 'KULIAH-API-2026';
+
+
+// =====================================
+// VARIABEL THRESHOLD
+// =====================================
+
+let batasSuhu = 30;
+let batasKelembaban = 80;
+
+let sensorOnline = false;
+
+let lastWarning = '';
+let notifikasiWarningAktif = false;
+
+async function aktifkanNotifikasi() {
+    if (!('Notification' in window)) {
+        alert('Browser ini tidak mendukung notifikasi.');
+        return;
+    }
+    const izin = await Notification.requestPermission();
+    log(izin === 'granted' ? 'Notifikasi browser diaktifkan' : 'Izin notifikasi belum diberikan', izin === 'granted' ? 'success' : 'warning-log');
+}
+
+function kirimNotifikasi(pesan) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('PERINGATAN SUHU ESP32', { body: pesan });
+    }
+}
+
+
+// =====================================
+// GRAFIK
+// =====================================
+
+const ctx = document.getElementById('sensorChart');
+
+const sensorChart = new Chart(ctx, {
+
+    type: 'line',
+
+    data: {
+
+        labels: [],
+
+        datasets: [
+
+            {
+                label: 'Suhu (°C)',
+                data: [],
+                borderColor: '#e74c3c',
+                backgroundColor: 'rgba(231,76,60,.1)',
+                tension: 0.3
+            },
+
+            {
+                label: 'Kelembaban (%)',
+                data: [],
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52,152,219,.1)',
+                tension: 0.3
+            }
+
+        ]
+
+    },
+
+    options: {
+
+        responsive: true,
+
+        maintainAspectRatio: false,
+
+        scales: {
+
+            y: {
+                beginAtZero: true
+            }
+
+        }
+
+    }
+
+});
+
+
+// =====================================
+// HEADER API
+// =====================================
+
+function getHeaders() {
+
+    return {
+
+        'Content-Type': 'application/json',
+
+        'x-api-key': API_KEY
+
+    };
+
+}
+
+
+// =====================================
+// LOG AKTIVITAS
+// =====================================
+
+function log(pesan, tipe='info') {
+
+    const el = document.getElementById('log');
+
+    const item = document.createElement('div');
+
+    item.className = tipe;
+
+    item.textContent =
+        `[${new Date().toLocaleTimeString()}] ${pesan}`;
+
+    el.appendChild(item);
+
+    el.scrollTop = el.scrollHeight;
+
+}
+
+
+// =====================================
+// STATUS SENSOR
+// =====================================
+
+function updateStatus(online) {
+
+    sensorOnline = online;
+
+    const badge =
+        document.getElementById('status-badge');
+
+    if(online) {
+
+        badge.textContent = 'ONLINE';
+
+        badge.className =
+            'status-badge online';
+
+    } else {
+
+        badge.textContent = 'OFFLINE';
+
+        badge.className =
+            'status-badge offline';
+
+        document.getElementById('threshold-badge').textContent =
+            'TIDAK DIKETAHUI';
+
+        document.getElementById('threshold-badge').className =
+            'status-badge offline';
+
+    }
+
+}
+
+
+// =====================================
+// SIMPAN THRESHOLD
+// =====================================
+
+async function simpanThreshold() {
+
+    const suhu = Number(
+        document.getElementById('thresholdSuhu').value
+    );
+
+    const kelembaban = Number(
+        document.getElementById('thresholdKelembaban').value
+    );
+
+    if (
+        document.getElementById('thresholdSuhu').value === '' ||
+        document.getElementById('thresholdKelembaban').value === '' ||
+        !Number.isFinite(suhu) ||
+        !Number.isFinite(kelembaban) ||
+        suhu < -50 || suhu > 100 ||
+        kelembaban < 0 || kelembaban > 100
+    ) {
+
+        alert('Masukkan threshold yang valid!');
+
+        return;
+
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/threshold`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify({ threshold: suhu })
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const result = await response.json();
+        if (result.status !== 'success') throw new Error(result.message || 'Threshold ditolak');
+
+        batasSuhu = suhu;
+        batasKelembaban = kelembaban;
+        lastWarning = '';
+        log(`Threshold suhu disimpan di Node-RED: ${batasSuhu}°C. Batas kelembaban ${batasKelembaban}% berlaku di dashboard.`, 'success');
+        alert('Threshold suhu berhasil disimpan ke Node-RED!');
+    } catch (err) {
+        log(`Gagal menyimpan threshold: ${err.message}`, 'error');
+        alert(`Gagal menyimpan threshold ke Node-RED: ${err.message}`);
+    }
+
+}
+
+
+// =====================================
+// CEK THRESHOLD
+// =====================================
+
+function cekThreshold(suhu, kelembaban) {
+
+    const suhuMelebihi = suhu > batasSuhu;
+
+    const kelembabanMelebihi =
+        kelembaban > batasKelembaban;
+
+    const badge =
+        document.getElementById('threshold-badge');
+
+    const statusSuhu =
+        document.getElementById('statusSuhu');
+
+    const statusKelembaban =
+        document.getElementById('statusKelembaban');
+
+    const peringatan =
+        document.getElementById('peringatan');
+
+    let pesan = [];
+
+    if(suhuMelebihi) {
+
+        statusSuhu.textContent = 'WARNING';
+
+        statusSuhu.className =
+            'status-badge warning';
+
+        pesan.push(
+            `Suhu melebihi batas (${suhu}°C > ${batasSuhu}°C)`
+        );
+
+    } else {
+
+        statusSuhu.textContent = 'NORMAL';
+
+        statusSuhu.className =
+            'status-badge normal';
+
+    }
+
+    if(kelembabanMelebihi) {
+
+        statusKelembaban.textContent = 'WARNING';
+
+        statusKelembaban.className =
+            'status-badge warning';
+
+        pesan.push(
+            `Kelembaban melebihi batas (${kelembaban}% > ${batasKelembaban}%)`
+        );
+
+    } else {
+
+        statusKelembaban.textContent = 'NORMAL';
+
+        statusKelembaban.className =
+            'status-badge normal';
+
+    }
+
+    if(suhuMelebihi || kelembabanMelebihi) {
+
+        badge.textContent = 'WARNING';
+
+        badge.className =
+            'status-badge warning';
+
+        peringatan.style.background = '#f8d7da';
+
+        peringatan.style.color = '#721c24';
+
+        peringatan.textContent =
+            'PERINGATAN: ' + pesan.join(' | ');
+
+        const warningKey = pesan.join('|');
+
+        if(warningKey !== lastWarning) {
+
+            log(
+                'THRESHOLD WARNING: ' + pesan.join(' | '),
+                'warning-log'
+            );
+
+            if (!notifikasiWarningAktif) {
+                kirimNotifikasi(pesan.join(' | '));
+                notifikasiWarningAktif = true;
+            }
+            lastWarning = warningKey;
+
+        }
+
+    } else {
+
+        badge.textContent = 'NORMAL';
+
+        badge.className =
+            'status-badge normal';
+
+        peringatan.style.background = '#d4edda';
+
+        peringatan.style.color = '#155724';
+
+        peringatan.textContent =
+            'Sensor dalam kondisi NORMAL';
+
+        if(lastWarning !== '') {
+
+            log(
+                'Sensor kembali ke kondisi NORMAL',
+                'success'
+            );
+
+            lastWarning = '';
+            notifikasiWarningAktif = false;
+
+        }
+
+    }
+
+}
+
+
+// =====================================
+// UPDATE GRAFIK
+// =====================================
+
+function updateChart(suhu, kelembaban) {
+
+    const waktu =
+        new Date().toLocaleTimeString();
+
+    sensorChart.data.labels.push(waktu);
+
+    sensorChart.data.datasets[0].data.push(suhu);
+
+    sensorChart.data.datasets[1].data.push(kelembaban);
+
+    // Maksimal 20 data grafik
+
+    if(sensorChart.data.labels.length > 20) {
+
+        sensorChart.data.labels.shift();
+
+        sensorChart.data.datasets.forEach(dataset => {
+            dataset.data.shift();
+        });
+
+    }
+
+    sensorChart.update('none');
+
+}
+
+
+// =====================================
+// FETCH SENSOR
+// =====================================
+
+async function fetchSensor() {
+
+    try {
+
+        const res = await fetch(
+            `${API_BASE}/suhu`,
+            {
+                method: 'GET',
+                headers: getHeaders()
+            }
+        );
+
+        if(!res.ok) {
+
+            throw new Error(`HTTP ${res.status}`);
+
+        }
+
+        const json = await res.json();
+
+        if(
+            json.status === 'success' &&
+            json.data &&
+            json.data.suhu !== null &&
+            json.data.suhu !== undefined
+        ) {
+
+            const suhu = Number(json.data.suhu);
+
+            const kelembaban =
+                Number(json.data.kelembaban);
+
+            if(
+                !Number.isFinite(suhu) ||
+                !Number.isFinite(kelembaban)
+            ) {
+
+                throw new Error('Format data sensor tidak valid');
+
+            }
+
+            document.getElementById('suhu').textContent =
+                suhu;
+
+            document.getElementById('kelembaban').textContent =
+                kelembaban;
+
+            updateStatus(true);
+
+            cekThreshold(suhu, kelembaban);
+
+            updateChart(suhu, kelembaban);
+
+        } else {
+
+            updateStatus(false);
+
+        }
+
+    } catch(err) {
+
+        updateStatus(false);
+
+        log(
+            `Gagal mengambil data suhu: ${err.message}`,
+            'error'
+        );
+
+    }
+
+}
+
+
+// =====================================
+// FETCH HISTORY
+// =====================================
+
+async function fetchHistory() {
+
+    try {
+
+        const res = await fetch(
+            `${API_BASE}/history`,
+            {
+                method: 'GET',
+                headers: getHeaders()
+            }
+        );
+
+        if(!res.ok) {
+
+            throw new Error(`HTTP ${res.status}`);
+
+        }
+
+        const json = await res.json();
+
+        const tbody =
+            document.getElementById('history-body');
+
+        if(!json.data || json.data.length === 0) {
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4"
+                        style="text-align:center">
+                        Belum ada data
+                    </td>
+                </tr>
+            `;
+
+            return;
+
+        }
+
+        const rows =
+            json.data.slice(0, 10);
+
+        tbody.innerHTML = '';
+
+        rows.forEach(d => {
+
+            const tr = document.createElement('tr');
+
+            const waktu = document.createElement('td');
+
+            const waktuData = d.waktu || d.received;
+            waktu.textContent = waktuData
+                ? new Date(waktuData).toLocaleTimeString()
+                : '--';
+
+            const suhu = document.createElement('td');
+
+            suhu.textContent = d.suhu ?? '--';
+
+            const kelembaban = document.createElement('td');
+
+            kelembaban.textContent =
+                d.kelembaban ?? '--';
+
+            const status = document.createElement('td');
+
+            const valid =
+                Number.isFinite(Number(d.suhu)) &&
+                Number.isFinite(Number(d.kelembaban));
+
+            const melewati =
+                valid &&
+                (
+                    Number(d.suhu) > batasSuhu ||
+                    Number(d.kelembaban) > batasKelembaban
+                );
+
+            status.textContent = valid
+                ? (melewati ? 'WARNING' : 'NORMAL')
+                : '--';
+
+            status.style.color = melewati
+                ? '#dc3545'
+                : '#28a745';
+
+            tr.appendChild(waktu);
+
+            tr.appendChild(suhu);
+
+            tr.appendChild(kelembaban);
+
+            tr.appendChild(status);
+
+            tbody.appendChild(tr);
+
+        });
+
+    } catch(err) {
+
+        const tbody = document.getElementById('history-body');
+        tbody.innerHTML = '';
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 4;
+        td.style.textAlign = 'center';
+        td.style.color = '#dc3545';
+        td.textContent = `Gagal memuat history: ${err.message}`;
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        log(
+            `Gagal mengambil history: ${err.message}`,
+            'error'
+        );
+
+    }
+
+}
+
+
+// =====================================
+// KONTROL LAMPU
+// =====================================
+
+async function kontrol(device, action) {
+
+    try {
+
+        const res = await fetch(
+            `${API_BASE}/kontrol`,
+            {
+                method: 'POST',
+
+                headers: getHeaders(),
+
+                body: JSON.stringify({
+
+                    device: device,
+
+                    action: action
+
+                })
+
+            }
+        );
+
+        if(!res.ok) {
+
+            throw new Error(`HTTP ${res.status}`);
+
+        }
+
+        const json = await res.json();
+
+        if(json.status === 'success') {
+
+            log(
+                `Perintah terkirim: ${device} → ${action}`,
+                'success'
+            );
+
+        } else {
+
+            log(
+                `Gagal: ${json.message || 'Perintah ditolak'}`,
+                'error'
+            );
+
+        }
+
+    } catch(err) {
+
+        log(
+            `Error kontrol: ${err.message}`,
+            'error'
+        );
+
+    }
+
+}
+
+
+// =====================================
+// MULAI DASHBOARD
+// =====================================
+
+log('Dashboard IoT dimulai', 'info');
+
+log('Threshold suhu maksimum: 30°C', 'info');
+
+log('Threshold kelembaban maksimum: 80%', 'info');
+
+log('Menghubungkan ke REST API Node-RED...', 'info');
+
+fetchSensor();
+
+fetchHistory();
+
+setInterval(fetchSensor, 3000);
+
+setInterval(fetchHistory, 5000);
+
+</script>
+
+</body>
+</html>

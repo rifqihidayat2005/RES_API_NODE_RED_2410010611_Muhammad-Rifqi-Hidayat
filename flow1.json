@@ -1,0 +1,642 @@
+[
+  {
+    "id": "16be0f85768927a6",
+    "type": "tab",
+    "label": "ESP32 API",
+    "disabled": false,
+    "info": "ESP32 API, MQTT, SQLite, WebSocket, Chart.js, Threshold dan API Key"
+  },
+  {
+    "id": "930ef27345268c5f",
+    "type": "mqtt in",
+    "z": "16be0f85768927a6",
+    "name": "Subscribe Sensor",
+    "topic": "iot/sensor",
+    "qos": "0",
+    "datatype": "json",
+    "broker": "mqtt_broker_config",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 150,
+    "y": 100,
+    "wires": [
+      [
+        "5e7f1295af37556e"
+      ]
+    ]
+  },
+  {
+    "id": "5e7f1295af37556e",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "Simpan Data Sensor",
+    "func": "var data = msg.payload;\n\nif (typeof data === 'string') {\n    try { data = JSON.parse(data); }\n    catch(e) { return null; }\n}\n\nif (!data || typeof data !== 'object') return null;\n\ndata.received = new Date().toISOString();\nflow.set('lastSensor', data);\n\nreturn {payload: data};",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 390,
+    "y": 100,
+    "wires": [
+      [
+        "e59b80748375b429",
+        "728343bca85229fe"
+      ]
+    ]
+  },
+  {
+    "id": "e59b80748375b429",
+    "type": "debug",
+    "z": "16be0f85768927a6",
+    "name": "Log Sensor",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "x": 650,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "728343bca85229fe",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "Proses Sensor SQLite WebSocket Threshold",
+    "func": "var data = msg.payload;\nvar suhu = Number(data.suhu);\nvar kelembaban = Number(data.kelembaban);\n\nif (!Number.isFinite(suhu)) return null;\nif (!Number.isFinite(kelembaban)) kelembaban = null;\n\nvar waktu = data.received || new Date().toISOString();\nvar batas = Number(flow.get('thresholdSuhu') || 35);\nvar isWarning = suhu > batas;\nvar wasWarning = flow.get('isSuhuWarning') === true;\n\n// Output 1: simpan setiap pembacaan ke SQLite\nvar dbMsg = {\n    topic: 'INSERT INTO sensor_history (suhu, kelembaban, waktu, data_json) VALUES ($suhu, $kelembaban, $waktu, $data_json)',\n    payload: [suhu, kelembaban, waktu, JSON.stringify(data)]\n};\n\n// Output 2: kirim pembacaan ke dashboard melalui WebSocket\nvar wsMsg = {\n    payload: JSON.stringify({\n        suhu: suhu,\n        kelembaban: kelembaban,\n        waktu: waktu,\n        threshold: batas,\n        status: isWarning ? 'warning' : 'normal'\n    })\n};\n\n// Output 3: kirim satu notifikasi MQTT saat baru melewati batas\nvar notifMsg = null;\nif (isWarning && !wasWarning) {\n    notifMsg = {\n        topic: 'iot/notifikasi',\n        payload: JSON.stringify({\n            status: 'warning',\n            message: 'PERINGATAN! Suhu melewati batas!',\n            suhu: suhu,\n            batas_suhu: batas,\n            waktu: waktu\n        })\n    };\n}\nflow.set('isSuhuWarning', isWarning);\n\nreturn [dbMsg, wsMsg, notifMsg];",
+    "outputs": 3,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 690,
+    "y": 140,
+    "wires": [
+      [
+        "722cc02e03c6d4fe"
+      ],
+      [
+        "9689ad5089085c0a"
+      ],
+      [
+        "4b7fccf01f9855f1"
+      ]
+    ]
+  },
+  {
+    "id": "4b7fccf01f9855f1",
+    "type": "mqtt out",
+    "z": "16be0f85768927a6",
+    "name": "Kirim Notifikasi Suhu",
+    "topic": "",
+    "qos": "0",
+    "retain": false,
+    "broker": "mqtt_broker_config",
+    "x": 1010,
+    "y": 200,
+    "wires": []
+  },
+  {
+    "id": "148126d5fbd47c7a",
+    "type": "inject",
+    "z": "16be0f85768927a6",
+    "name": "Inisialisasi Database",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 540,
+    "wires": [
+      [
+        "bccf5218e3e194eb"
+      ]
+    ]
+  },
+  {
+    "id": "bccf5218e3e194eb",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "Buat Tabel Sensor",
+    "func": "msg.topic = 'CREATE TABLE IF NOT EXISTS sensor_history (id INTEGER PRIMARY KEY AUTOINCREMENT, suhu REAL, kelembaban REAL, waktu TEXT, data_json TEXT)';\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "x": 390,
+    "y": 540,
+    "wires": [
+      [
+        "d9f1bed3b5dac0a1"
+      ]
+    ]
+  },
+  {
+    "id": "d9f1bed3b5dac0a1",
+    "type": "sqlite",
+    "z": "16be0f85768927a6",
+    "mydb": "1728c231c6a934d6",
+    "sqlquery": "msg.topic",
+    "sql": "",
+    "name": "SQLite Inisialisasi",
+    "x": 640,
+    "y": 540,
+    "wires": [
+      [
+        "b6f409c4f5d429eb"
+      ]
+    ]
+  },
+  {
+    "id": "b6f409c4f5d429eb",
+    "type": "debug",
+    "z": "16be0f85768927a6",
+    "name": "Status Database",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "x": 850,
+    "y": 540,
+    "wires": []
+  },
+  {
+    "id": "722cc02e03c6d4fe",
+    "type": "sqlite",
+    "z": "16be0f85768927a6",
+    "mydb": "1728c231c6a934d6",
+    "sqlquery": "msg.topic",
+    "sql": "",
+    "name": "Simpan Riwayat Sensor",
+    "x": 990,
+    "y": 120,
+    "wires": [
+      [
+        "c93a9852e734063a"
+      ]
+    ]
+  },
+  {
+    "id": "c93a9852e734063a",
+    "type": "debug",
+    "z": "16be0f85768927a6",
+    "name": "Log SQLite",
+    "active": true,
+    "tosidebar": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "x": 1200,
+    "y": 120,
+    "wires": []
+  },
+  {
+    "id": "9689ad5089085c0a",
+    "type": "websocket out",
+    "z": "16be0f85768927a6",
+    "name": "WebSocket Sensor",
+    "server": "6c08b8d75fefffae",
+    "client": "",
+    "x": 1000,
+    "y": 160,
+    "wires": []
+  },
+  {
+    "id": "a8d0715b2a586306",
+    "type": "http in",
+    "z": "16be0f85768927a6",
+    "name": "GET /api/suhu",
+    "url": "/api/suhu",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 150,
+    "y": 260,
+    "wires": [
+      [
+        "a0cdfb16700bbe56"
+      ]
+    ]
+  },
+  {
+    "id": "a0cdfb16700bbe56",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "API Key Suhu",
+    "func": "var API_KEY = 'KULIAH-API-2026';\nvar key = msg.req.headers['x-api-key'];\nif (key !== API_KEY) {\n    msg.statusCode = 401;\n    msg.payload = {status:'error',message:'API Key tidak valid'};\n    return [null,msg];\n}\nreturn [msg,null];",
+    "outputs": 2,
+    "timeout": "",
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 370,
+    "y": 260,
+    "wires": [
+      [
+        "d3f3783ab2fbeed9"
+      ],
+      [
+        "17f51aaab9dc1605"
+      ]
+    ]
+  },
+  {
+    "id": "d3f3783ab2fbeed9",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "Build Response Suhu",
+    "func": "var data = flow.get('lastSensor') || {suhu:null,kelembaban:null,received:null};\nmsg.payload = {status:'success',data:data,server_time:new Date().toISOString()};\nmsg.headers = {'Access-Control-Allow-Origin':'*'};\nreturn msg;",
+    "outputs": 1,
+    "x": 590,
+    "y": 260,
+    "wires": [
+      [
+        "17f51aaab9dc1605"
+      ]
+    ]
+  },
+  {
+    "id": "17f51aaab9dc1605",
+    "type": "http response",
+    "z": "16be0f85768927a6",
+    "name": "Response Suhu",
+    "statusCode": "",
+    "headers": {},
+    "x": 820,
+    "y": 260,
+    "wires": []
+  },
+  {
+    "id": "1ea023e75bf64b60",
+    "type": "http in",
+    "z": "16be0f85768927a6",
+    "name": "GET /api/history",
+    "url": "/api/history",
+    "method": "get",
+    "upload": false,
+    "x": 150,
+    "y": 340,
+    "wires": [
+      [
+        "51646f619fbdd7ee"
+      ]
+    ]
+  },
+  {
+    "id": "51646f619fbdd7ee",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "API Key History",
+    "func": "var API_KEY = 'KULIAH-API-2026';\nif (msg.req.headers['x-api-key'] !== API_KEY) {\n    msg.statusCode = 401;\n    msg.payload = {status:'error',message:'API Key tidak valid'};\n    return [null,msg];\n}\nreturn [msg,null];",
+    "outputs": 2,
+    "x": 370,
+    "y": 340,
+    "wires": [
+      [
+        "c777d55ff3e5274e"
+      ],
+      [
+        "de01775df5d2ce07"
+      ]
+    ]
+  },
+  {
+    "id": "c777d55ff3e5274e",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "Query History SQLite",
+    "func": "msg.topic = 'SELECT id, suhu, kelembaban, waktu FROM sensor_history WHERE suhu IS NOT NULL AND waktu IS NOT NULL ORDER BY id DESC LIMIT 10';\nmsg.payload = [];\nreturn msg;",
+    "outputs": 1,
+    "x": 590,
+    "y": 340,
+    "wires": [
+      [
+        "aff49727cbd53bce"
+      ]
+    ]
+  },
+  {
+    "id": "aff49727cbd53bce",
+    "type": "sqlite",
+    "z": "16be0f85768927a6",
+    "mydb": "1728c231c6a934d6",
+    "sqlquery": "msg.topic",
+    "sql": "",
+    "name": "Ambil History SQLite",
+    "x": 820,
+    "y": 340,
+    "wires": [
+      [
+        "cdceb372f87d3f2f"
+      ]
+    ]
+  },
+  {
+    "id": "cdceb372f87d3f2f",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "Format History",
+    "func": "var rows = Array.isArray(msg.payload) ? msg.payload : [];\nmsg.statusCode = 200;\nmsg.headers = {'Access-Control-Allow-Origin':'*'};\nmsg.payload = {status:'success',count:rows.length,data:rows};\nreturn msg;",
+    "outputs": 1,
+    "x": 1030,
+    "y": 340,
+    "wires": [
+      [
+        "de01775df5d2ce07"
+      ]
+    ]
+  },
+  {
+    "id": "de01775df5d2ce07",
+    "type": "http response",
+    "z": "16be0f85768927a6",
+    "name": "Response History",
+    "statusCode": "",
+    "headers": {},
+    "x": 1250,
+    "y": 340,
+    "wires": []
+  },
+  {
+    "id": "9d99045d2ad2f5b8",
+    "type": "http in",
+    "z": "16be0f85768927a6",
+    "name": "POST /api/kontrol",
+    "url": "/api/kontrol",
+    "method": "post",
+    "upload": false,
+    "x": 150,
+    "y": 420,
+    "wires": [
+      [
+        "081b60afd9669a2f"
+      ]
+    ]
+  },
+  {
+    "id": "081b60afd9669a2f",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "API Key Kontrol",
+    "func": "var API_KEY = 'KULIAH-API-2026';\nif (msg.req.headers['x-api-key'] !== API_KEY) {\n    msg.statusCode = 401;\n    msg.payload = {status:'error',message:'API Key tidak valid'};\n    return [null,msg];\n}\nreturn [msg,null];",
+    "outputs": 2,
+    "x": 370,
+    "y": 420,
+    "wires": [
+      [
+        "9787db380b9a6fd1"
+      ],
+      [
+        "5cfca5415cdb6af8"
+      ]
+    ]
+  },
+  {
+    "id": "9787db380b9a6fd1",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "Validasi dan Publish",
+    "func": "var body = msg.payload;\nif (!body || !body.device || !body.action) {\n    msg.statusCode = 400;\n    msg.payload = {status:'error',message:'device dan action wajib diisi'};\n    return [msg,null];\n}\nvar mqttMsg = {payload:body,topic:'iot/kontrol'};\nmsg.statusCode = 200;\nmsg.headers = {'Access-Control-Allow-Origin':'*'};\nmsg.payload = {status:'success',message:'Perintah terkirim',sent:body};\nreturn [msg,mqttMsg];",
+    "outputs": 2,
+    "x": 590,
+    "y": 420,
+    "wires": [
+      [
+        "5cfca5415cdb6af8"
+      ],
+      [
+        "a7736f449378a945"
+      ]
+    ]
+  },
+  {
+    "id": "5cfca5415cdb6af8",
+    "type": "http response",
+    "z": "16be0f85768927a6",
+    "name": "Response Kontrol",
+    "statusCode": "",
+    "headers": {},
+    "x": 850,
+    "y": 420,
+    "wires": []
+  },
+  {
+    "id": "a7736f449378a945",
+    "type": "mqtt out",
+    "z": "16be0f85768927a6",
+    "name": "Publish Kontrol",
+    "topic": "",
+    "qos": "0",
+    "retain": false,
+    "broker": "mqtt_broker_config",
+    "x": 850,
+    "y": 470,
+    "wires": []
+  },
+  {
+    "id": "9c1f970982497fdd",
+    "type": "http in",
+    "z": "16be0f85768927a6",
+    "name": "PUT /api/threshold",
+    "url": "/api/threshold",
+    "method": "put",
+    "upload": false,
+    "x": 150,
+    "y": 620,
+    "wires": [
+      [
+        "2e7d0d1dd47693b8"
+      ]
+    ]
+  },
+  {
+    "id": "2e7d0d1dd47693b8",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "API Key Threshold",
+    "func": "var API_KEY = 'KULIAH-API-2026';\nif (msg.req.headers['x-api-key'] !== API_KEY) {\n    msg.statusCode = 401;\n    msg.payload = {status:'error',message:'API Key tidak valid'};\n    return [null,msg];\n}\nreturn [msg,null];",
+    "outputs": 2,
+    "x": 380,
+    "y": 620,
+    "wires": [
+      [
+        "6628e7a524515a80"
+      ],
+      [
+        "4be83121905b7b4d"
+      ]
+    ]
+  },
+  {
+    "id": "6628e7a524515a80",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "Validasi dan Simpan Threshold",
+    "func": "var body = msg.payload || {};\nvar batas = Number(body.threshold);\nif (!Number.isFinite(batas) || batas <= 0) {\n    msg.statusCode = 400;\n    msg.payload = {status:'error',message:'Threshold harus berupa angka positif'};\n    return msg;\n}\nflow.set('thresholdSuhu',batas);\nmsg.statusCode = 200;\nmsg.headers = {'Access-Control-Allow-Origin':'*'};\nmsg.payload = {status:'success',message:'Batas suhu berhasil diperbarui',threshold:batas};\nreturn msg;",
+    "outputs": 1,
+    "x": 640,
+    "y": 620,
+    "wires": [
+      [
+        "4be83121905b7b4d"
+      ]
+    ]
+  },
+  {
+    "id": "4be83121905b7b4d",
+    "type": "http response",
+    "z": "16be0f85768927a6",
+    "name": "Response Threshold",
+    "statusCode": "",
+    "headers": {},
+    "x": 900,
+    "y": 620,
+    "wires": []
+  },
+  {
+    "id": "1c4fdb42824ca3ba",
+    "type": "http in",
+    "z": "16be0f85768927a6",
+    "name": "GET Dashboard",
+    "url": "/dashboard",
+    "method": "get",
+    "upload": false,
+    "x": 150,
+    "y": 740,
+    "wires": [
+      [
+        "4453986bb7a2aefb"
+      ]
+    ]
+  },
+  {
+    "id": "4453986bb7a2aefb",
+    "type": "template",
+    "z": "16be0f85768927a6",
+    "name": "Dashboard Chart.js",
+    "field": "payload",
+    "fieldType": "msg",
+    "format": "handlebars",
+    "syntax": "mustache",
+    "template": "<!DOCTYPE html>\n<html lang=\"id\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Monitoring ESP32</title>\n<script src=\"https://cdn.jsdelivr.net/npm/chart.js\"></script>\n<style>\n*{box-sizing:border-box}body{font-family:Arial,sans-serif;background:#eef2ff;margin:0;padding:20px;color:#1f2937}\n.container{max-width:1050px;margin:auto}.panel{background:#fff;border-radius:12px;padding:20px;margin:0 0 18px;box-shadow:0 4px 16px rgba(0,0,0,.08)}\nh1{text-align:center;color:#fff;margin:5px 0 22px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px}\n.card{background:#fff;border-radius:12px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.08)}.label{color:#6b7280;font-size:13px}.value{font-size:32px;font-weight:bold;margin-top:8px;color:#4f46e5}\n#status{padding:11px;border-radius:8px;text-align:center;background:#e5e7eb;margin-bottom:16px;font-weight:bold}#warning{padding:13px;border-radius:8px;background:#dcfce7;color:#166534}\nbutton{border:0;border-radius:8px;padding:10px 15px;background:#4f46e5;color:#fff;font-weight:bold;cursor:pointer;margin:0 0 12px}button:hover{opacity:.9}\n.chart{height:300px;position:relative}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:14px}th{background:#f3f4f6;color:#4b5563}\n.bad{color:#b91c1c;font-weight:bold}.good{color:#15803d;font-weight:bold}.muted{color:#6b7280;text-align:center}\n@media(max-width:600px){body{padding:10px}.panel{padding:14px}.chart{height:250px}table{font-size:12px}}\n</style>\n</head>\n<body>\n<div class=\"container\">\n<h1>MONITORING SENSOR ESP32</h1>\n<div id=\"status\">Menghubungkan WebSocket...</div>\n<div class=\"cards\">\n  <div class=\"card\"><div class=\"label\">SUHU</div><div class=\"value\"><span id=\"suhu\">--</span> °C</div></div>\n  <div class=\"card\"><div class=\"label\">KELEMBABAN</div><div class=\"value\"><span id=\"kelembaban\">--</span> %</div></div>\n  <div class=\"card\"><div class=\"label\">BATAS SUHU</div><div class=\"value\"><span id=\"batas\">35</span> °C</div></div>\n</div>\n<div class=\"panel\">\n  <h3>Peringatan Sensor</h3>\n  <div id=\"warning\">Sensor dalam kondisi NORMAL</div>\n  <p><button id=\"enableNotifications\">Aktifkan Notifikasi Browser</button></p>\n</div>\n<div class=\"panel\"><h3>Grafik Real-Time Sensor</h3><div class=\"chart\"><canvas id=\"sensorChart\"></canvas></div></div>\n<div class=\"panel\">\n  <h3>10 Data Sensor Terakhir</h3>\n  <table><thead><tr><th>Waktu</th><th>Suhu (°C)</th><th>Kelembaban (%)</th><th>Status</th></tr></thead>\n  <tbody id=\"history-body\"><tr><td colspan=\"4\" class=\"muted\">Memuat riwayat...</td></tr></tbody></table>\n</div>\n</div>\n<script>\nconst API_KEY = 'KULIAH-API-2026';\nconst historyBody = document.getElementById('history-body');\nlet historyRows = [];\nlet wasWarning = false;\nconst chart = new Chart(document.getElementById('sensorChart'), {\n  type: 'line',\n  data: {labels: [], datasets: [\n    {label:'Suhu (°C)', data:[], borderColor:'#dc2626', tension:.3},\n    {label:'Kelembaban (%)', data:[], borderColor:'#2563eb', tension:.3}\n  ]},\n  options: {responsive:true, maintainAspectRatio:false, animation:false, scales:{y:{beginAtZero:true}}}\n});\nfunction waktuTampil(value) {\n  if (!value) return '--';\n  const d = new Date(value);\n  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString('id-ID');\n}\nfunction statusRow(d) {\n  const lim = Number(d.threshold ?? document.getElementById('batas').textContent);\n  return Number(d.suhu) > lim ? 'WARNING' : 'NORMAL';\n}\nfunction renderHistory() {\n  historyBody.innerHTML = '';\n  if (!historyRows.length) {\n    const tr = historyBody.insertRow(); const td = tr.insertCell(); td.colSpan=4; td.className='muted'; td.textContent='Belum ada data sensor'; return;\n  }\n  historyRows.slice(0,10).forEach(d => {\n    const tr = historyBody.insertRow();\n    const values = [waktuTampil(d.waktu || d.received), d.suhu ?? '--', d.kelembaban ?? '--'];\n    values.forEach(v => { const td=tr.insertCell(); td.textContent=v; });\n    const td=tr.insertCell(); const status=statusRow(d); td.textContent=status; td.className=status==='WARNING'?'bad':'good';\n  });\n}\nasync function loadHistory() {\n  try {\n    const res = await fetch('/api/history', {headers:{'X-API-Key':API_KEY}});\n    if (!res.ok) throw new Error('HTTP '+res.status);\n    const result = await res.json();\n    historyRows = Array.isArray(result.data) ? result.data.slice(0,10) : [];\n    renderHistory();\n  } catch (err) {\n    historyBody.innerHTML=''; const tr=historyBody.insertRow(); const td=tr.insertCell(); td.colSpan=4; td.className='bad'; td.textContent='Gagal memuat history: '+err.message;\n  }\n}\nfunction prependHistory(d) {\n  historyRows.unshift(d);\n  historyRows = historyRows.slice(0,10);\n  renderHistory();\n}\ndocument.getElementById('enableNotifications').addEventListener('click', async () => {\n  if (!('Notification' in window)) { alert('Browser ini tidak mendukung notifikasi.'); return; }\n  const permission = await Notification.requestPermission();\n  document.getElementById('enableNotifications').textContent = permission === 'granted' ? 'Notifikasi Aktif' : 'Izin Notifikasi Belum Diberikan';\n});\nfunction connectWebSocket() {\n  const scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';\n  const ws = new WebSocket(scheme + location.host + '/ws/sensor');\n  ws.onopen = () => { document.getElementById('status').textContent='ONLINE'; };\n  ws.onclose = () => { document.getElementById('status').textContent='WEBSOCKET TERPUTUS — mencoba menghubungkan kembali'; setTimeout(connectWebSocket,3000); };\n  ws.onerror = () => { document.getElementById('status').textContent='Koneksi WebSocket bermasalah'; };\n  ws.onmessage = (event) => {\n    try {\n      const d = JSON.parse(event.data);\n      document.getElementById('suhu').textContent = d.suhu ?? '--';\n      document.getElementById('kelembaban').textContent = d.kelembaban ?? '--';\n      document.getElementById('batas').textContent = d.threshold ?? 35;\n      const time = new Date(d.waktu || Date.now()).toLocaleTimeString();\n      chart.data.labels.push(time); chart.data.datasets[0].data.push(d.suhu); chart.data.datasets[1].data.push(d.kelembaban);\n      if (chart.data.labels.length > 20) { chart.data.labels.shift(); chart.data.datasets.forEach(s => s.data.shift()); }\n      chart.update('none');\n      const warning = d.status === 'warning';\n      const box = document.getElementById('warning');\n      box.textContent = warning ? `PERINGATAN: Suhu ${d.suhu} °C melewati batas ${d.threshold} °C` : 'Sensor dalam kondisi NORMAL';\n      box.style.background = warning ? '#fee2e2' : '#dcfce7'; box.style.color = warning ? '#991b1b' : '#166534';\n      if (warning && !wasWarning && 'Notification' in window && Notification.permission === 'granted') {\n        new Notification('PERINGATAN SUHU ESP32', {body:`Suhu ${d.suhu} °C melewati batas ${d.threshold} °C`});\n      }\n      wasWarning = warning;\n      prependHistory(d);\n      document.getElementById('status').textContent = warning ? 'ONLINE — SUHU MELEWATI BATAS' : 'ONLINE — Sensor Normal';\n    } catch (err) { console.error('Data WebSocket tidak valid:', err); }\n  };\n}\nloadHistory().finally(connectWebSocket);\n</script>\n</body>\n</html>",
+    "output": "str",
+    "x": 420,
+    "y": 740,
+    "wires": [
+      [
+        "be53f8da8dcad772"
+      ]
+    ]
+  },
+  {
+    "id": "be53f8da8dcad772",
+    "type": "http response",
+    "z": "16be0f85768927a6",
+    "name": "Dashboard Response",
+    "statusCode": "",
+    "headers": {},
+    "x": 680,
+    "y": 740,
+    "wires": []
+  },
+  {
+    "id": "ab695c44b19740a7",
+    "type": "http in",
+    "z": "16be0f85768927a6",
+    "name": "OPTIONS CORS",
+    "url": "/api/*",
+    "method": "options",
+    "upload": false,
+    "x": 150,
+    "y": 830,
+    "wires": [
+      [
+        "b293405a209ebc87"
+      ]
+    ]
+  },
+  {
+    "id": "b293405a209ebc87",
+    "type": "function",
+    "z": "16be0f85768927a6",
+    "name": "CORS Headers",
+    "func": "msg.statusCode = 204;\nmsg.payload = '';\nmsg.headers = {\n    'Access-Control-Allow-Origin':'*',\n    'Access-Control-Allow-Methods':'GET, POST, PUT, OPTIONS',\n    'Access-Control-Allow-Headers':'Content-Type, X-API-Key'\n};\nreturn msg;",
+    "outputs": 1,
+    "x": 390,
+    "y": 830,
+    "wires": [
+      [
+        "ea42ebc602b0e9c2"
+      ]
+    ]
+  },
+  {
+    "id": "ea42ebc602b0e9c2",
+    "type": "http response",
+    "z": "16be0f85768927a6",
+    "name": "CORS Response",
+    "statusCode": "",
+    "headers": {},
+    "x": 640,
+    "y": 830,
+    "wires": []
+  },
+  {
+    "id": "mqtt_broker_config",
+    "type": "mqtt-broker",
+    "name": "Local Mosquitto",
+    "broker": "localhost",
+    "port": "1883",
+    "clientid": "node-red-backend",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": 15,
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "1728c231c6a934d6",
+    "type": "sqlitedb",
+    "db": "./sensor.db",
+    "mode": "RWC"
+  },
+  {
+    "id": "6c08b8d75fefffae",
+    "type": "websocket-listener",
+    "path": "/ws/sensor",
+    "wholemsg": "false"
+  },
+  {
+    "id": "0b68e79725d957a5",
+    "type": "global-config",
+    "env": [],
+    "modules": {
+      "node-red-node-sqlite": "2.0.1"
+    }
+  }
+]
